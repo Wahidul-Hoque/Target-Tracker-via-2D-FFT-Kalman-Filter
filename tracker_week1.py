@@ -27,6 +27,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from PIL import Image, ImageTk
 
+import fft_engine
+import preprocessing
+
 matplotlib.use("TkAgg")
 
 
@@ -143,17 +146,23 @@ class DSPDiagnosticStrip(ctk.CTkFrame):
                 spine.set_edgecolor(PALETTE["border"])
             ax.set_xticks([])
             ax.set_yticks([])
-            # Placeholder: subtle noise texture
-            placeholder = np.random.rand(32, 32) * 0.15
-            ax.imshow(placeholder, cmap="plasma", aspect="auto", vmin=0, vmax=1)
-            ax.text(
-                0.5, 0.5, "–",
-                transform=ax.transAxes,
-                ha="center", va="center",
-                color=PALETTE["text_muted"],
-                fontsize=20,
-                alpha=0.4,
-            )
+            
+            if i == 1:
+                # Connected with our new preprocessing module
+                window = preprocessing.generate_2d_hann_window(32, 32)
+                ax.imshow(window, cmap="viridis", aspect="auto")
+            else:
+                # Placeholder: subtle noise texture
+                placeholder = np.random.rand(32, 32) * 0.15
+                ax.imshow(placeholder, cmap="plasma", aspect="auto", vmin=0, vmax=1)
+                ax.text(
+                    0.5, 0.5, "–",
+                    transform=ax.transAxes,
+                    ha="center", va="center",
+                    color=PALETTE["text_muted"],
+                    fontsize=20,
+                    alpha=0.4,
+                )
             self._axes.append(ax)
 
         self._canvas = FigureCanvasTkAgg(self._fig, master=self)
