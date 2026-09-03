@@ -29,7 +29,7 @@ from PIL import Image, ImageTk
 
 import fft_engine
 import preprocessing
-
+import phase_correlation
 matplotlib.use("TkAgg")
 
 
