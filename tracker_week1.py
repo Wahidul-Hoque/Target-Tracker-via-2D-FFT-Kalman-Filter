@@ -1,18 +1,4 @@
-"""
-=============================================================================
-Target Tracker via 2D FFT & Kalman Filter
-CSE 220 — BUET | Week 1 Deliverable: UI Shell & Video Ingestion Engine
-=============================================================================
-Authors : Wahidul Haque (2305054) & Abu Bakar Siddique (2305059)
-Week    : 1 / 7
-Purpose : Complete GUI shell with live video playback, control panel,
-          real-time metric labels, and DSP diagnostic placeholder strip.
-          NO tracking algorithms are implemented yet.
 
-Dependencies:
-    pip install customtkinter imageio[ffmpeg] matplotlib pillow
-=============================================================================
-"""
 
 import threading
 import time
