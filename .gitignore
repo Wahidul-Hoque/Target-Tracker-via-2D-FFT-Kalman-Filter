@@ -1,22 +1,63 @@
-# Python / Virtual Environment
-.venv/
-venv/
-ENV/
-env/
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# IDE & Editor Settings
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+media/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Project Output & Temporary Files
-*.log
+# Operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local videos and session exports
 *.mp4
 *.avi
-*.mkv
 *.mov
-!sample_video.mp4  # Uncomment if you track a sample video
+*.mkv
+*.webm
+*.m4v
+signal13_session*.csv
+
+# Local archives
+*.zip
+*.tar
+*.tar.gz
+*.7z
