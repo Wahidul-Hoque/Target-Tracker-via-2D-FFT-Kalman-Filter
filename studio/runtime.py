@@ -52,6 +52,9 @@ class Workspace:
         self.diagnostics = {}
         self.diagnostic_frame = None
         self.last_diagnostic = 0
+        # Full uploaded reference photo, kept at native resolution for ROI selection.
+        self.reference_image = None
+        self.reference_name = ''
 
     def new_log(self):
         self.log.close()
@@ -98,18 +101,48 @@ class Workspace:
                 'center', 'measurement', 'velocity', 'bbox_size', 'status', 'psr',
                 'appearance', 'misses', 'processing_ms', 'trajectory', 'reason', 'search_box')}
         loaded = e.frame is not None
+
+        target = None
+        if e.tracker.ready:
+            center = (
+                list(e.tracker.filter.state[:2])
+                if getattr(e.tracker, 'locked', False) and e.tracker.filter is not None
+                else None
+            )
+            target = dict(center=center, size=list(e.tracker.size))
+
+        reference = dict(
+            loaded=self.reference_image is not None,
+            selected=e.reference_target is not None,
+            name=self.reference_name,
+            width=int(self.reference_image.shape[1]) if self.reference_image is not None else 0,
+            height=int(self.reference_image.shape[0]) if self.reference_image is not None else 0,
+        )
+
         return native(dict(
-            loaded=loaded, ready=e.tracker.ready, ended=self.ended,
-            name=self.name, fps=e.fps, warning=e.fps_warning,
-            total=self.total, index=e.source.index if loaded else -1,
+            loaded=loaded,
+            ready=e.tracker.ready,
+            locked=bool(getattr(e.tracker, 'locked', False)),
+            ended=self.ended,
+            name=self.name,
+            fps=e.fps,
+            warning=e.fps_warning,
+            total=self.total,
+            index=e.source.index if loaded else -1,
             width=e.frame.shape[1] if loaded else 0,
             height=e.frame.shape[0] if loaded else 0,
             image=image_url(e.frame) if loaded and include_image else None,
             result=result,
-            target=dict(center=list(e.tracker.filter.state[:2]), size=list(e.tracker.size))
-                   if e.tracker.ready else None,
-            diagnostics=self.diagnostics, diagnostic_frame=self.diagnostic_frame,
-            analytics=dict(total=self.log.total, accepted=self.log.accepted, rows=list(self.log.rows))))
+            target=target,
+            reference=reference,
+            diagnostics=self.diagnostics,
+            diagnostic_frame=self.diagnostic_frame,
+            analytics=dict(
+                total=self.log.total,
+                accepted=self.log.accepted,
+                rows=list(self.log.rows),
+            ),
+        ))
 
     def close(self):
         self.engine.close()
