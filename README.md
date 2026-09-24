@@ -4,7 +4,7 @@ A new browser GUI for your existing FFT + Kalman tracking project. This is a loc
 
 ## Start here (Windows)
 
-Use Python 3.10 or newer. Open a terminal in this extracted folder, where `main.py` is located:
+Use Python 3.10 or newer. Open a terminal in this extracted folder, w.venv\Scripts\python main.pyhere `main.py` is located:
 
 ```powershell
 py -m venv .venv
