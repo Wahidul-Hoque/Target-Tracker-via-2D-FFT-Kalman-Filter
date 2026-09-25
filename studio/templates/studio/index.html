@@ -19,14 +19,14 @@
 <main>
 <div class="page-heading"><div><div class="eyebrow" id="eyebrow">01 / LOCALIZE + PREDICT</div><h1 id="page-title">Tracking Studio<span>.</span></h1><p id="page-description">A clearer view of every movement.</p></div><div class="header-actions"><button class="button quiet" id="demo">▷ <span>Load demo</span></button><button class="button quiet" id="target-upload">▧ <span>Open target image</span></button><button class="button primary" id="upload">↑ <span>Open video</span></button><input type="file" id="target-image-file" accept=".png,.jpg,.jpeg,.bmp,.webp,image/png,image/jpeg,image/bmp,image/webp" hidden><input type="file" id="video-file" accept=".mp4,.avi,.mov,.mkv,.webm,.m4v" hidden></div></div>
 <div id="notice" class="notice" role="status" aria-live="polite">Open a video and select a target, or upload a target image and select the object inside that image.</div>
+<section id="page-studio" class="page">
 <section class="reference-panel panel" id="reference-panel" hidden>
-<div class="panel-header"><span><i class="small-dot"></i> REFERENCE TARGET IMAGE</span><span class="mono" id="reference-name">NO IMAGE</span></div>
+<div class="panel-header"><span><i class="small-dot"></i> REFERENCE TARGET IMAGE</span><div style="display:flex;align-items:center;gap:12px"><span class="mono" id="reference-name">NO IMAGE</span><button class="text-button" id="remove-reference" type="button" title="Remove reference target image">✕ Remove</button></div></div>
 <div class="reference-layout">
 <div class="reference-stage" id="reference-stage"><canvas id="reference-canvas" width="640" height="360" aria-label="Reference image. Press Select target from image, then drag around the object."></canvas><span class="selection-hint" id="reference-selection-hint" hidden>Drag a tight target box on the original image · Esc to cancel</span></div>
 <div class="reference-controls"><div><div class="label">IMAGE TARGET MODE</div><strong id="reference-status">Image loaded</strong><p class="subtle">The selected ROI is cropped from the original image pixels with no resizing. Global search continues until this object appears in the video.</p></div><button class="button primary" id="reference-roi">⌖ Select target from image</button></div>
 </div>
 </section>
-<section id="page-studio" class="page">
 <div class="studio-grid">
 <div class="viewer-card panel"><div class="panel-header"><span><i class="small-dot"></i> LIVE VIEW</span><span class="mono" id="resolution">NO SOURCE</span></div>
 <div class="video-stage" id="video-stage"><div class="empty" id="empty"><div class="reticle"><span>+</span></div><div class="eyebrow">YOUR NEXT EXPERIMENT STARTS HERE</div><h2>Follow the signal.</h2><p>Bring a video. Pick a target.<br>Watch motion become data.</p><button class="button primary" id="empty-demo">Explore the demo <span>↗</span></button><small>Or drag a video into this workspace</small></div><canvas id="video" width="640" height="360" aria-label="Video preview. Use Select target, then drag a rectangle on the video." hidden></canvas><span class="selection-hint" id="selection-hint" hidden>Drag a tight target box · Esc to cancel</span></div>

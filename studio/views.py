@@ -128,6 +128,21 @@ def api(request, action):
                 w.new_log()
 
             # -------------------------------------------------
+            # REFERENCE IMAGE: remove uploaded image and selected target.
+            # Keep the currently opened video/frame available so the user
+            # can immediately switch back to manual video target selection.
+            # -------------------------------------------------
+            elif action == 'target-clear':
+                w.reference_image = None
+                w.reference_name = ''
+                w.engine.reference_target = None
+                w.engine.tracker = type(w.engine.tracker)()
+                w.engine.result = None
+                w.diagnostics = {}
+                w.diagnostic_frame = None
+                w.new_log()
+
+            # -------------------------------------------------
             # REFERENCE IMAGE: select exact native-pixel ROI.
             # No resizing/enlargement is performed.
             # -------------------------------------------------

@@ -84,6 +84,9 @@ function controls() {
   $('reference-roi').disabled =
     !referenceImage || busy > 0;
 
+  $('remove-reference').disabled =
+    !state?.reference?.loaded || busy > 0;
+
   $('play').disabled =
     !loaded ||
     ended ||
@@ -742,6 +745,24 @@ async function render(s) {
 
     $('reference-panel').hidden =
       true;
+
+    referenceImage = null;
+    referenceSelecting = false;
+    referenceDrag = null;
+    referenceSelectionBox = null;
+
+    $('reference-selection-hint').hidden =
+      true;
+
+    referenceCanvas.style.cursor =
+      '';
+
+    referenceCtx.clearRect(
+      0,
+      0,
+      referenceCanvas.width,
+      referenceCanvas.height
+    );
   }
 
 
@@ -2717,6 +2738,29 @@ $('reference-roi').onclick =
 
 
     controls();
+  };
+
+
+$('remove-reference').onclick =
+  async () => {
+
+    pause();
+
+    referenceSelecting = false;
+    referenceDrag = null;
+    referenceSelectionBox = null;
+
+    $('reference-selection-hint').hidden =
+      true;
+
+    referenceCanvas.style.cursor =
+      '';
+
+    await mutate(
+      'target-clear',
+      {},
+      'Reference target removed. You can select a target directly from the video or open another target image.'
+    );
   };
 
 
