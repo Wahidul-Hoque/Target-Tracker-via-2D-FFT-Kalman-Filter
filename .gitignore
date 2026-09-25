@@ -48,7 +48,6 @@ Thumbs.db
 Desktop.ini
 
 # Local videos and session exports
-*.mp4
 *.avi
 *.mov
 *.mkv
