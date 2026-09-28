@@ -1,307 +1,132 @@
-# Signal13 — FFT + Kalman Object Tracking Workbench
+# FALCON — Signal 13
+### Fast Adaptive Localization via Correlation & Kalman-filter Observation Network
 
-Signal13 is a local Django-based object tracking application that uses a **custom FFT**, **phase correlation**, **PSR**, **NCC appearance matching**, and a **Kalman filter** to track and re-acquire a selected object.
-
-The project supports both direct target selection from a video and target selection from a separate reference image.
-
----
-
-## Features
-
-- Custom iterative radix-2 Cooley–Tukey FFT
-- No `numpy.fft`, SciPy FFT, pretrained detector, or OpenCV tracker
-- FFT phase correlation for translation estimation
-- Subpixel peak refinement
-- PSR confidence measurement
-- NCC appearance similarity
-- Constant-velocity Kalman filter
-- Local tracking around the predicted target position
-- Dynamic overlapping global search grid
-- Time-sliced global re-acquisition
-- Automatic recovery after occlusion, teleportation, or large displacement
-- Indefinite searching when the target is not currently visible
-- Reference-image target selection at native pixel resolution
-- Fixed reference template + adaptive tracking template
-- Live search window, target box, Kalman output, and trajectory
-- DSP Lab for inspecting FFT/correlation stages
-- Session Analytics for PSR and NCC over time
-- CSV session export
-- Synthetic demo source
+> A CPU-based, browser-served object tracker that **locks on, stays on and tracks the object** — no pretrained models, no GPU, no black boxes.
 
 ---
 
-## How Tracking Works
+## What Is FALCON?
 
-Signal13 has two main states:
+A falcon locks onto fast-moving prey mid-flight and re-acquires it the instant it reappears from behind an obstacle.  
+That is exactly what this system does.
 
-```text
-SEARCHING  ── target found ──>  TRACKING
-    ^                            |
-    |                            |
-    └──── tracking failure ──────┘
+**FALCON** is a local, browser-based object tracker built from scratch.  
+You select a target — from the video itself, or from a separate reference image.  
+FALCON tracks it using a **custom 2D FFT phase correlation engine**, validates every match with **PSR + NCC sanity checks**, and keeps a **Kalman filter** predicting where to look next.
+
+When the target disappears, FALCON doesn't give up. It quietly switches to a **time-sliced global grid search** and keeps scanning until the object is found again.
+
+---
+
+## The Acronym, Letter by Letter
+
+| Letter | Stands For | What It Does |
+|--------|-----------|--------------|
+| **F** | Fast | Searches only a small local region, not the whole frame |
+| **A** | Adaptive | Working template slowly updates to small appearance changes |
+| **L** | Localization | Finds where the target is, frame to frame |
+| **C** | Correlation | Custom FFT phase correlation estimates the displacement |
+| **O** | Observation | PSR + NCC act as dual sanity checks on every match |
+| **N** | Network | Full pipeline: Django app, DSP modules, live analytics |
+
+---
+
+## Key Features
+
+- **Custom iterative radix-2 Cooley–Tukey FFT** — zero `numpy.fft`, zero SciPy, zero OpenCV tracker
+- **2D phase correlation** for sub-pixel displacement estimation
+- **PSR** (Peak-to-Sidelobe Ratio) confidence scoring
+- **NCC** (Normalized Cross-Correlation) appearance validation
+- **Constant-velocity Kalman filter** for motion prediction and smoothing
+- **Two-state design**: `TRACKING` ↔ `SEARCHING` — clean, honest, no hidden states
+- **Time-sliced global grid search** — CPU-safe re-acquisition without frame drops
+- **Fixed reference template** anchors re-acquisition back to the true target
+- **Dual template system** — reference (fixed) + working (slowly adaptive)
+- **Reference-image target selection** — select a target that hasn't appeared yet
+- **Live DSP visualization** — search window, FFT magnitude, correlation surface, peak
+- **Session Analytics** — PSR and NCC plotted over every frame
+- **CSV export** — full session data for offline analysis
+- **100% local** — runs on `127.0.0.1:8000`, no cloud, no API keys
+
+---
+
+## How It Works
+
+FALCON operates in exactly two states:
+
+```
+SEARCHING ── strong PSR + NCC match ──► TRACKING
+    ▲                                       │
+    └──────────── local match fails ◄───────┘
 ```
 
-### TRACKING
+### While TRACKING
 
-When the object is locked:
+Every frame:
+1. Kalman filter **predicts** the next target center
+2. A local search window is extracted around that prediction
+3. **Custom 2D FFT** computes the cross-power spectrum
+4. Inverse FFT yields the correlation surface → peak = estimated displacement
+5. **Sub-pixel parabolic refinement** sharpens the location
+6. **PSR** checks: is the peak sharp and distinctive?
+7. **NCC** checks: does this region actually look like the target?
+8. Pass → Kalman **update**. Fail → switch to `SEARCHING`
 
-1. Kalman filter predicts the next position.
-2. A local search window is created around that prediction.
-3. Phase correlation estimates displacement.
-4. PSR checks correlation quality.
-5. NCC checks visual similarity.
-6. A valid measurement updates the Kalman filter.
+### While SEARCHING
 
-### SEARCHING
+1. The frame is divided into overlapping grid tiles
+2. Only a **few tiles per frame** are checked (default: 4) — keeps CPU load stable
+3. Each tile is matched against the **fixed reference template** (no drift)
+4. A tile passing strong PSR ≥ 15 and NCC ≥ 0.50 triggers re-acquisition
+5. Kalman filter resets to the new position → back to `TRACKING`
 
-When the target position is unknown:
-
-1. The whole frame is divided into overlapping tiles.
-2. Only a small batch of tiles is checked per frame.
-3. The scan continues through the frame repeatedly.
-4. Each candidate is checked using PSR and NCC.
-5. A strong match resets the Kalman filter at the new position.
-6. Tracking resumes immediately.
-
----
-
-## Target Selection
-
-### Option 1 — Select From Video
-
-Use this when the object is already visible.
-
-1. Open a video.
-2. Click **Select target in video**.
-3. Draw a tight box around the object.
-4. Press **Play**.
-
-### Option 2 — Select From Reference Image
-
-Use this when the object may appear later.
-
-1. Click **Open target image**.
-2. Select an image.
-3. Click **Select target from image**.
-4. Draw a tight box around the object.
-5. Open the video.
-6. Press **Play**.
-
-The selected image ROI is cropped directly from the original image with **no resizing or enlargement**.
-
-The tracker starts in `SEARCHING`, finds the object when it appears, switches to `TRACKING`, and returns to `SEARCHING` whenever the object is lost.
+> The tracker stays in `SEARCHING` indefinitely. There is no final failure — useful when the target appears from a reference image and may not show up until much later in the video.
 
 ---
 
-## Matching and Confidence
+## Project Structure
 
-### Phase Correlation
-
-For search spectrum `S` and template spectrum `T`:
-
-```text
-R = (S × conj(T)) / |S × conj(T)|
 ```
-
-The inverse FFT of `R` produces the correlation surface. Its peak gives the estimated translation.
-
-### PSR — Peak-to-Sidelobe Ratio
-
-PSR measures how clearly the best correlation peak stands above the rest of the surface.
-
-Higher PSR generally means a more reliable translation estimate.
-
-PSR is a confidence score, not a probability.
-
-### NCC — Normalized Cross-Correlation
-
-NCC compares the candidate patch with the target template.
-
-Typical interpretation:
-
-```text
-1.00   very strong appearance match
-0.00   little similarity
-< 0    poor/opposite correlation
-```
-
-PSR answers **"Is the correlation peak reliable?"**
-
-NCC answers **"Does this candidate look like the target?"**
-
-Both are used together for re-acquisition.
-
----
-
-## Kalman Filter
-
-The tracker uses the state:
-
-```text
-[x, y, vx, vy]
-```
-
-where:
-
-- `x, y` = target center
-- `vx, vy` = velocity in pixels/second
-
-The Kalman filter predicts the next local search position and smooths accepted measurements.
-
-After global re-acquisition, the filter is reset to the newly detected target position.
-
----
-
-## Reference and Working Templates
-
-Signal13 keeps two templates:
-
-- **Reference template:** the original selected target. It never changes and is used for global searching.
-- **Working template:** used during local tracking and may slowly adapt after strong matches.
-
-This reduces long-term template drift while still allowing small appearance changes during tracking.
-
----
-
-## Custom FFT
-
-The FFT engine is implemented in:
-
-```text
-signal13/core/fft_engine.py
-```
-
-It uses a custom iterative radix-2 Cooley–Tukey FFT.
-
-Final optimizations include:
-
-- `float32` image data
-- `complex64` FFT data
-- cached FFT plans
-- cached twiddle factors
-- cached Hann windows
-- reduced temporary allocations
-- optimized inverse FFT
-- optimized PSR/peak-search allocations
-
-Search dimensions are rounded to powers of two.
-
-To print the active FFT sizes, set:
-
-```python
-FFT_DEBUG_SHAPES = True
-```
-
-Example output:
-
-```text
-[FFT] 2D shape = 256 x 256
+Signal13/
+│
+├── signal13/                  # Core tracking engine
+│   ├── core/
+│   │   ├── fft_engine.py      # Custom iterative radix-2 FFT
+│   │   ├── phase_correlation.py  # Cross-power spectrum, peak, PSR
+│   │   ├── preprocessing.py   # Grayscale, mean-subtraction, Hann window
+│   │   ├── kalman.py          # Constant-velocity Kalman filter
+│   │   └── tracker.py         # TRACKING / SEARCHING state machine
+│   ├── io/
+│   │   ├── sources.py         # Video input & synthetic demo source
+│   │   └── session.py         # Session logging, CSV export
+│   └── ui/
+│       └── worker.py          # Connects source → tracker
+│
+├── studio/                    # Django app (UI layer)
+│   ├── templates/studio/index.html
+│   ├── static/studio/app.js
+│   ├── static/studio/style.css
+│   ├── runtime.py             # Browser workspace state
+│   └── views.py               # Django API, file uploads
+│
+├── webconfig/                 # Django project settings
+├── main.py                    # One-command launcher
+├── requirements.txt
+├── FALCON.pdf                 # Project presentation slides
+└── README.md
 ```
 
 ---
 
-## Important Tracker Settings
-
-Main tuning values are in:
-
-```text
-signal13/core/tracker.py
-```
-
-| Setting | Default | Purpose |
-|---|---:|---|
-| `psr_threshold` | `10.0` | Local PSR threshold |
-| `appearance_threshold` | `0.35` | Local NCC threshold |
-| `search_factor` | `3.0` | Local search-window scale |
-| `global_search_factor` | `3.0` | Global tile scale |
-| `strong_appearance` | `0.50` | Strong NCC needed for re-acquisition |
-| `strong_psr_factor` | `1.5` | Strong PSR multiplier |
-| `global_scan_max_tiles_per_frame` | `4` | Maximum global tiles checked per frame |
-| `global_scan_target_frames` | `24` | Approximate frames used for one global sweep |
-| `max_search_side` | `512` | Maximum FFT search dimension |
-| `template_learning_rate` | `0.1` | Working-template adaptation rate |
-
-With the defaults, strong global re-acquisition requires approximately:
-
-```text
-PSR >= 15
-NCC >= 0.50
-```
-
----
-
-## Interface
-
-### Tracking Studio
-
-Shows:
-
-- video
-- current tracker state
-- target box
-- FFT measurement
-- Kalman output
-- trajectory
-- active search window
-- PSR
-- NCC appearance similarity
-- position
-- speed
-- processing time
-
-### DSP Lab
-
-Displays:
-
-- target crop
-- windowed search
-- log FFT magnitude
-- correlation surface
-- detected correlation peak
-
-### Session Analytics
-
-Displays:
-
-- PSR over source frames
-- NCC appearance similarity over source frames
-
-The complete session can also be exported as CSV.
-
----
-
-## CSV Export
-
-The exported session contains:
-
-```text
-frame
-time_s
-status
-x
-y
-vx
-vy
-measurement_x
-measurement_y
-psr
-appearance
-misses
-processing_ms
-reason
-```
-
----
-
-## Installation
+## Getting Started
 
 ### Requirements
 
-- Python 3.10+
-- Modern browser
-- Packages listed in `requirements.txt`
+- Python **3.10+**
+- Any modern browser
+- Dependencies in `requirements.txt`
 
-### Windows
+### Install & Run — Windows
 
 ```powershell
 py -m venv .venv
@@ -310,7 +135,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Linux / macOS
+### Install & Run — Linux / macOS
 
 ```bash
 python3 -m venv .venv
@@ -319,158 +144,121 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Then open:
-
-```text
-http://127.0.0.1:8000
-```
-
+Then open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser.  
 Stop the server with `Ctrl + C`.
 
 ---
 
-## Supported Inputs
+## Target Selection
 
-### Video
+### From the Video
 
-Supported:
+Best when the object is already on screen at the start.
 
-```text
-MP4, AVI, MOV, MKV, WebM, M4V
-```
+1. Open a video file
+2. Click **Select target in video**
+3. Draw a tight bounding box around the object
+4. Press **Play**
 
-Maximum size:
+### From a Reference Image
 
-```text
-512 MB
-```
+Best when the object may appear later in the video.
 
-H.264 MP4 is recommended.
+1. Click **Open target image** → select an image file
+2. Click **Select target from image**
+3. Draw a tight bounding box around the object
+4. Open the video and press **Play**
 
-### Target Image
-
-Supported:
-
-```text
-PNG, JPG, JPEG, BMP, WebP
-```
-
-Limits:
-
-```text
-Maximum file size: 20 MB
-Maximum decoded size: 32 megapixels
-Minimum selected ROI: 8 × 8 pixels
-```
+The tracker starts in `SEARCHING`, finds the object when it appears, locks on, and automatically re-acquires if it disappears.  
+The ROI is taken at native resolution — **no resizing, no interpolation artifacts**.
 
 ---
 
-## Project Structure
+## Supported Formats
 
-```text
-Signal13_Django/
-│
-├── signal13/
-│   ├── core/
-│   │   ├── fft_engine.py
-│   │   ├── preprocessing.py
-│   │   ├── phase_correlation.py
-│   │   ├── kalman.py
-│   │   └── tracker.py
-│   ├── io/
-│   │   ├── sources.py
-│   │   └── session.py
-│   └── ui/
-│       └── worker.py
-│
-├── studio/
-│   ├── templates/studio/index.html
-│   ├── static/studio/app.js
-│   ├── static/studio/style.css
-│   ├── runtime.py
-│   └── views.py
-│
-├── webconfig/
-├── main.py
-├── requirements.txt
-├── README.md
-└── .gitignore
-```
+| Input | Formats | Limits |
+|-------|---------|--------|
+| Video | `MP4`, `AVI`, `MOV`, `MKV`, `WebM`, `M4V` | 512 MB max · H.264 MP4 recommended |
+| Reference image | `PNG`, `JPG`, `JPEG`, `BMP`, `WebP` | 20 MB · 32 MP decoded · ROI ≥ 8×8 px |
 
 ---
 
-## Main Modules
+## Tracker Settings
 
-| File | Role |
-|---|---|
-| `fft_engine.py` | Custom forward/inverse FFT |
-| `phase_correlation.py` | Correlation, peak detection, PSR |
-| `preprocessing.py` | Grayscale, Hann window, crops |
-| `kalman.py` | Motion prediction and smoothing |
-| `tracker.py` | Tracking, global search, re-acquisition |
-| `sources.py` | Video/demo input |
-| `session.py` | Session logging and CSV export |
-| `worker.py` | Connects source and tracker |
-| `runtime.py` | Browser workspace state |
-| `views.py` | Django API and uploads |
-| `app.js` | Frontend interaction and visualization |
-| `index.html` | Main UI |
-| `style.css` | UI styling |
-| `main.py` | Application launcher |
+Main tuning knobs live in `signal13/core/tracker.py`:
+
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `psr_threshold` | `10.0` | Minimum PSR to accept a local match |
+| `appearance_threshold` | `0.35` | Minimum NCC to accept a local match |
+| `search_factor` | `3.0` | Local search window scale multiplier |
+| `global_search_factor` | `3.0` | Global tile size scale multiplier |
+| `strong_appearance` | `0.50` | NCC required for global re-acquisition |
+| `strong_psr_factor` | `1.5` | PSR multiplier for global re-acquisition |
+| `global_scan_max_tiles_per_frame` | `4` | Tiles checked per frame during search |
+| `global_scan_target_frames` | `24` | Frames budgeted for one full global sweep |
+| `max_search_side` | `512` | Maximum FFT search dimension (px) |
+| `template_learning_rate` | `0.1` | Working-template adaptation speed |
+
+Default global re-acquisition requires: **PSR ≥ 15** and **NCC ≥ 0.50**
 
 ---
 
-## Performance
+## FFT Engine Details
 
-The system is CPU-based.
+Located in `signal13/core/fft_engine.py`. Key optimizations:
 
-Performance depends mainly on:
+- `float32` pixel data / `complex64` FFT data
+- Cached FFT plans, twiddle factors, and Hann windows
+- Reduced temporary allocations
+- Optimized inverse FFT path
+- Search dimensions rounded to powers of two
 
-- target size
-- FFT dimensions
-- video resolution
-- CPU performance
-- number of global tiles processed per frame
 
-Normal tracking is faster because it searches only near the Kalman prediction.
+---
 
-Global searching is intentionally time-sliced so the entire frame is not processed with FFT correlation at once.
+## Interface Panels
+
+### Tracking Studio
+Live video overlay showing: tracker state · target box · Kalman prediction · trajectory · active search window · PSR · NCC · position · speed · processing time (ms)
+
+### DSP Lab
+Frame-by-frame signal inspection: target crop → windowed search → log FFT magnitude → correlation surface → detected peak
+
+### Session Analytics
+PSR and NCC plotted over every source frame. Full session exportable as CSV.
+
+**CSV columns:** `frame · time_s · status · x · y · vx · vy · measurement_x · measurement_y · psr · appearance · misses · processing_ms · reason`
 
 ---
 
 ## Limitations
 
-Signal13 is mainly a translation tracker.
+FALCON is a **translation tracker** — honest about what it does and doesn't do:
 
-For best results:
+- No scale invariance — a target at a very different size than the template will weaken matching
+- No rotation invariance — large rotations can break PSR/NCC
+- Single-target only — tracks one selected identity at a time
+- No semantic understanding — matches pixels, not concepts
+- Similar-looking distractors can cause wrong re-acquisition
+- Global search has latency — a very briefly visible target may be missed
+- CPU-bound — the custom FFT is educational and transparent, but slower than optimized library or GPU FFTs
 
-- use a tight target crop
-- choose an object with visible texture or edges
-- keep the target at approximately the same scale as the selected template
-- avoid large rotations or extreme blur
-
-Current limitations:
-
-- no explicit scale invariance
-- no explicit rotation invariance
-- single-target tracking
-- no semantic object recognition
-- similar-looking distractors may cause ambiguous matches
-- global re-acquisition speed depends on CPU performance and grid size
+**Best results:** tight crop · object with clear texture or edges · consistent scale · minimal rotation or extreme blur
 
 ---
 
 ## Privacy
 
-Signal13 runs locally on:
-
-```text
-127.0.0.1:8000
-```
-
-Videos and target images are processed locally by the application.
-
-No cloud API or external tracking service is required.
+Everything runs locally on your machine at `127.0.0.1:8000`.  
+No video, image, or tracking data ever leaves your computer.  
+No cloud API. No telemetry. No accounts.
 
 ---
 
+## Authors
+
+**Abu Bakar Siddique** (2305059) · **Wahidul Hoque** (2305054)  
+Signal 13 — September 2026
+
+---
