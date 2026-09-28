@@ -40,12 +40,6 @@ dist/
 Thumbs.db
 Desktop.ini
 
-*.mp4
-*.avi
-*.mov
-*.mkv
-*.webm
-*.m4v
 
 signal13_session*.csv
 
